@@ -238,31 +238,50 @@ type PreviewOrderResult struct {
 	Quote    PreviewOrderQuote
 }
 
-// raw preview JSON (internal) — only fields we map into PreviewOrderResult.
-type previewOrderRaw struct {
-	Success  bool   `json:"success"`
-	CartUUID string `json:"cart_uuid"`
-	Message  string `json:"message"`
-	Quote    *struct {
-		LineItems         []PreviewLineItem `json:"line_items"`
-		IsDashPassApplied bool              `json:"is_dashpass_applied"`
-		NetTotalBeforeTip MoneyAmount       `json:"net_total_before_tip"`
-		DeliveryAddress   *struct {
-			PrintableAddress string `json:"printable_address"`
-		} `json:"delivery_address"`
-		StoreOrderCart *struct {
-			FulfillmentType string `json:"fulfillment_type"`
-			Orders          []struct {
-				OrderItems []struct {
-					Quantity                 int `json:"quantity"`
-					UnitPriceMonetaryFields  *MoneyAmount `json:"unit_price_monetary_fields"`
-					Item                     *struct {
-						Name string `json:"name"`
-					} `json:"item"`
-				} `json:"order_items"`
-			} `json:"orders"`
-		} `json:"store_order_cart"`
-	} `json:"quote"`
+// previewOrderRawJSON is the structuredContent shape from order preview.
+// We decode into this, then copy the fields we care about into PreviewOrderResult.
+type previewOrderRawJSON struct {
+	Success  bool               `json:"success"`
+	CartUUID string             `json:"cart_uuid"`
+	Message  string             `json:"message"`
+	Quote    *previewQuoteJSON  `json:"quote"`
+}
+
+// previewQuoteJSON is the quote object inside order preview JSON.
+type previewQuoteJSON struct {
+	LineItems         []PreviewLineItem           `json:"line_items"`
+	IsDashPassApplied bool                        `json:"is_dashpass_applied"`
+	NetTotalBeforeTip MoneyAmount                 `json:"net_total_before_tip"`
+	DeliveryAddress   *previewDeliveryAddressJSON `json:"delivery_address"`
+	StoreOrderCart    *previewStoreOrderCartJSON  `json:"store_order_cart"`
+}
+
+// previewDeliveryAddressJSON holds the printable address on the quote.
+type previewDeliveryAddressJSON struct {
+	PrintableAddress string `json:"printable_address"`
+}
+
+// previewStoreOrderCartJSON holds fulfillment mode and nested store orders.
+type previewStoreOrderCartJSON struct {
+	FulfillmentType string                     `json:"fulfillment_type"`
+	Orders          []previewStoreOrderJSON    `json:"orders"`
+}
+
+// previewStoreOrderJSON is one store order inside the cart quote.
+type previewStoreOrderJSON struct {
+	OrderItems []previewOrderItemJSON `json:"order_items"`
+}
+
+// previewOrderItemJSON is one line item inside a store order.
+type previewOrderItemJSON struct {
+	Quantity                int                     `json:"quantity"`
+	UnitPriceMonetaryFields *MoneyAmount            `json:"unit_price_monetary_fields"`
+	Item                    *previewCatalogItemJSON `json:"item"`
+}
+
+// previewCatalogItemJSON is the catalog item nested under an order line.
+type previewCatalogItemJSON struct {
+	Name string `json:"name"`
 }
 
 // PreviewOrder loads pricing for a cart without charging.
@@ -291,36 +310,40 @@ func (client *CLIClient) PreviewOrder(ctx context.Context, intentText string, ca
 		return nil, err
 	}
 
-	var raw previewOrderRaw
-	if err := decodeStructuredContent(cliStdout, &raw); err != nil {
+	var rawPreview previewOrderRawJSON
+	if err := decodeStructuredContent(cliStdout, &rawPreview); err != nil {
 		return nil, err
 	}
-	if !raw.Success {
-		failureMessage := raw.Message
+	if !rawPreview.Success {
+		failureMessage := rawPreview.Message
 		if failureMessage == "" {
 			failureMessage = "order preview failed"
 		}
-		return &PreviewOrderResult{Success: false, CartUUID: raw.CartUUID, Message: raw.Message}, fmt.Errorf("ddcli: %s", failureMessage)
+		return &PreviewOrderResult{
+			Success:  false,
+			CartUUID: rawPreview.CartUUID,
+			Message:  rawPreview.Message,
+		}, fmt.Errorf("ddcli: %s", failureMessage)
 	}
 
-	result := &PreviewOrderResult{
+	previewResult := &PreviewOrderResult{
 		Success:  true,
-		CartUUID: raw.CartUUID,
-		Message:  raw.Message,
+		CartUUID: rawPreview.CartUUID,
+		Message:  rawPreview.Message,
 	}
-	if raw.Quote == nil {
-		return result, nil
+	if rawPreview.Quote == nil {
+		return previewResult, nil
 	}
 
-	result.Quote.LineItems = raw.Quote.LineItems
-	result.Quote.IsDashPassApplied = raw.Quote.IsDashPassApplied
-	result.Quote.NetTotalBeforeTip = raw.Quote.NetTotalBeforeTip
-	if raw.Quote.DeliveryAddress != nil {
-		result.Quote.DeliveryAddress = raw.Quote.DeliveryAddress.PrintableAddress
+	previewResult.Quote.LineItems = rawPreview.Quote.LineItems
+	previewResult.Quote.IsDashPassApplied = rawPreview.Quote.IsDashPassApplied
+	previewResult.Quote.NetTotalBeforeTip = rawPreview.Quote.NetTotalBeforeTip
+	if rawPreview.Quote.DeliveryAddress != nil {
+		previewResult.Quote.DeliveryAddress = rawPreview.Quote.DeliveryAddress.PrintableAddress
 	}
-	if raw.Quote.StoreOrderCart != nil {
-		result.Quote.FulfillmentType = raw.Quote.StoreOrderCart.FulfillmentType
-		for _, storeOrder := range raw.Quote.StoreOrderCart.Orders {
+	if rawPreview.Quote.StoreOrderCart != nil {
+		previewResult.Quote.FulfillmentType = rawPreview.Quote.StoreOrderCart.FulfillmentType
+		for _, storeOrder := range rawPreview.Quote.StoreOrderCart.Orders {
 			for _, orderItem := range storeOrder.OrderItems {
 				quoteItem := PreviewQuoteItem{Quantity: orderItem.Quantity}
 				if orderItem.Item != nil {
@@ -329,9 +352,9 @@ func (client *CLIClient) PreviewOrder(ctx context.Context, intentText string, ca
 				if orderItem.UnitPriceMonetaryFields != nil {
 					quoteItem.UnitPriceDisplay = orderItem.UnitPriceMonetaryFields.DisplayString
 				}
-				result.Quote.Items = append(result.Quote.Items, quoteItem)
+				previewResult.Quote.Items = append(previewResult.Quote.Items, quoteItem)
 			}
 		}
 	}
-	return result, nil
+	return previewResult, nil
 }
