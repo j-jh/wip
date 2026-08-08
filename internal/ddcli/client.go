@@ -3,34 +3,35 @@ package ddcli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 )
 
-const defaultBin = "dd-cli"
+const defaultCLIBinaryName = "dd-cli"
 
-// Client runs dd-cli as a subprocess with --json-output.
+// CLIClient runs dd-cli as a subprocess with --json-output.
 //
 // Fields:
-//   - Bin (string) — path or name of the dd-cli binary.
+//   - BinaryPath (string) — path or name of the dd-cli binary.
 //     Empty means: use DD_CLI_BIN if set, otherwise "dd-cli" on PATH.
-type Client struct {
-	Bin string
+type CLIClient struct {
+	BinaryPath string
 }
 
-func (c *Client) bin() string {
-	if c != nil && c.Bin != "" {
-		return c.Bin
+func (client *CLIClient) resolveCLIBinaryPath() string {
+	if client != nil && client.BinaryPath != "" {
+		return client.BinaryPath
 	}
-	if env := os.Getenv("DD_CLI_BIN"); env != "" {
-		return env
+	if envPath := os.Getenv("DD_CLI_BIN"); envPath != "" {
+		return envPath
 	}
-	return defaultBin
+	return defaultCLIBinaryName
 }
 
-// Intent builds the --intent string required by most dd-cli service commands.
+// BuildIntent formats the --intent string required by most dd-cli service commands.
 //
 // Params:
 //   - summary (string) — who this is for and the goal (not a restatement of the command)
@@ -38,50 +39,82 @@ func (c *Client) bin() string {
 //
 // Returns:
 //   - string — formatted intent ready to pass as --intent
-func Intent(summary, userPrompt string) string {
-	var b strings.Builder
-	b.WriteString("Summary: ")
-	b.WriteString(summary)
+func BuildIntent(summary, userPrompt string) string {
+	var intentBuilder strings.Builder
+	intentBuilder.WriteString("Summary: ")
+	intentBuilder.WriteString(summary)
 	if userPrompt != "" {
-		b.WriteString("\nuser prompt/purpose: \"")
-		b.WriteString(userPrompt)
-		b.WriteString("\"")
+		intentBuilder.WriteString("\nuser prompt/purpose: \"")
+		intentBuilder.WriteString(userPrompt)
+		intentBuilder.WriteString("\"")
 	}
-	return b.String()
+	return intentBuilder.String()
 }
 
-// Run executes dd-cli with --json-output prepended to args.
+// RunCLICommand executes dd-cli with --json-output prepended to cliArgs.
 //
 // Params:
 //   - ctx (context.Context) — cancel / timeout for the subprocess
-//   - args (...string) — CLI args after the binary name (subcommand + flags)
+//   - cliArgs (...string) — CLI args after the binary name (subcommand + flags)
 //
 // Returns:
 //   - []byte — trimmed stdout (JSON when the command supports --json-output)
 //   - error — non-zero exit; message includes stderr when present
 //
-// Notes: low-level helper. Prefer typed methods like AddressList for callers.
-func (c *Client) Run(ctx context.Context, args ...string) ([]byte, error) {
-	full := make([]string, 0, len(args)+1)
-	full = append(full, "--json-output")
-	full = append(full, args...)
+// Notes: low-level helper. Prefer typed methods like ListDeliveryAddresses for callers.
+func (client *CLIClient) RunCLICommand(ctx context.Context, cliArgs ...string) ([]byte, error) {
+	argsWithJSONOutput := make([]string, 0, len(cliArgs)+1)
+	argsWithJSONOutput = append(argsWithJSONOutput, "--json-output")
+	argsWithJSONOutput = append(argsWithJSONOutput, cliArgs...)
 
-	cmd := exec.CommandContext(ctx, c.bin(), full...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	cliCommand := exec.CommandContext(ctx, client.resolveCLIBinaryPath(), argsWithJSONOutput...)
+	var stdoutBuffer, stderrBuffer bytes.Buffer
+	cliCommand.Stdout = &stdoutBuffer
+	cliCommand.Stderr = &stderrBuffer
 
-	err := cmd.Run()
-	out := bytes.TrimSpace(stdout.Bytes())
-	if err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = strings.TrimSpace(stdout.String())
+	runErr := cliCommand.Run()
+	trimmedStdout := bytes.TrimSpace(stdoutBuffer.Bytes())
+	if runErr != nil {
+		errorMessage := strings.TrimSpace(stderrBuffer.String())
+		if errorMessage == "" {
+			errorMessage = strings.TrimSpace(stdoutBuffer.String())
 		}
-		if msg == "" {
-			msg = err.Error()
+		if errorMessage == "" {
+			errorMessage = runErr.Error()
 		}
-		return out, fmt.Errorf("ddcli: %w: %s", err, msg)
+		return trimmedStdout, fmt.Errorf("ddcli: %w: %s", runErr, errorMessage)
 	}
-	return out, nil
+	return trimmedStdout, nil
+}
+
+// cliJSONOutputEnvelope is the outer --json-output shape from dd-cli.
+// The command payload lives under structuredContent.
+type cliJSONOutputEnvelope struct {
+	StructuredContent json.RawMessage `json:"structuredContent"`
+	IsError           bool            `json:"isError"`
+}
+
+// decodeStructuredContent unmarshals dd-cli --json-output into commandResult from structuredContent.
+//
+// Params:
+//   - cliStdout ([]byte) — full CLI stdout
+//   - commandResult (any) — pointer to the command result struct
+//
+// Returns:
+//   - error — bad JSON, missing structuredContent, or envelope isError
+func decodeStructuredContent(cliStdout []byte, commandResult any) error {
+	var outputEnvelope cliJSONOutputEnvelope
+	if err := json.Unmarshal(cliStdout, &outputEnvelope); err != nil {
+		return fmt.Errorf("ddcli: decode envelope: %w", err)
+	}
+	if outputEnvelope.IsError {
+		return fmt.Errorf("ddcli: CLI reported isError")
+	}
+	if len(outputEnvelope.StructuredContent) == 0 {
+		return fmt.Errorf("ddcli: missing structuredContent")
+	}
+	if err := json.Unmarshal(outputEnvelope.StructuredContent, commandResult); err != nil {
+		return fmt.Errorf("ddcli: decode structuredContent: %w", err)
+	}
+	return nil
 }
