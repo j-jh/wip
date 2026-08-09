@@ -64,10 +64,10 @@ type PastOrder struct {
 //   - PageFull (bool) — true if more results may exist; widen max/days
 //   - Orders ([]PastOrder) — past orders in the window
 type ListOrderHistoryResult struct {
-	Success bool        `json:"success"`
-	Message string      `json:"message,omitempty"`
-	PageFull bool       `json:"page_full"`
-	Orders  []PastOrder `json:"orders"`
+	Success  bool        `json:"success"`
+	Message  string      `json:"message,omitempty"`
+	PageFull bool        `json:"page_full"`
+	Orders   []PastOrder `json:"orders"`
 }
 
 // ListOrderHistory lists recent orders for the signed-in account.
@@ -105,6 +105,7 @@ func (client *CLIClient) ListOrderHistory(ctx context.Context, intentText string
 	if err := decodeStructuredContent(cliStdout, &orderHistoryResult); err != nil {
 		return nil, err
 	}
+
 	if !orderHistoryResult.Success {
 		failureMessage := orderHistoryResult.Message
 		if failureMessage == "" {
@@ -112,6 +113,7 @@ func (client *CLIClient) ListOrderHistory(ctx context.Context, intentText string
 		}
 		return &orderHistoryResult, fmt.Errorf("ddcli: %s", failureMessage)
 	}
+
 	return &orderHistoryResult, nil
 }
 
@@ -150,7 +152,12 @@ func (client *CLIClient) ReorderPastOrder(ctx context.Context, intentText string
 		return nil, fmt.Errorf("ddcli: orderUUID is required")
 	}
 
-	cliStdout, err := client.RunCLICommand(ctx, "order", "reorder", "--order-uuid", orderUUID, "--intent", intentText)
+	cliStdout, err := client.RunCLICommand(
+		ctx,
+		"order", "reorder",
+		"--order-uuid", orderUUID,
+		"--intent", intentText,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -159,6 +166,7 @@ func (client *CLIClient) ReorderPastOrder(ctx context.Context, intentText string
 	if err := decodeStructuredContent(cliStdout, &reorderResult); err != nil {
 		return nil, err
 	}
+
 	if !reorderResult.Success {
 		failureMessage := reorderResult.Message
 		if failureMessage == "" {
@@ -169,6 +177,7 @@ func (client *CLIClient) ReorderPastOrder(ctx context.Context, intentText string
 		}
 		return &reorderResult, fmt.Errorf("ddcli: %s", failureMessage)
 	}
+
 	return &reorderResult, nil
 }
 
@@ -238,16 +247,16 @@ type PreviewOrderResult struct {
 	Quote    PreviewOrderQuote
 }
 
-// previewOrderRawJSON is the structuredContent shape from order preview.
-// We decode into this, then copy the fields we care about into PreviewOrderResult.
+// The types below mirror nested CLI JSON for order preview.
+// Callers never see them — PreviewOrder copies into the flatter types above.
+
 type previewOrderRawJSON struct {
-	Success  bool               `json:"success"`
-	CartUUID string             `json:"cart_uuid"`
-	Message  string             `json:"message"`
-	Quote    *previewQuoteJSON  `json:"quote"`
+	Success  bool              `json:"success"`
+	CartUUID string            `json:"cart_uuid"`
+	Message  string            `json:"message"`
+	Quote    *previewQuoteJSON `json:"quote"`
 }
 
-// previewQuoteJSON is the quote object inside order preview JSON.
 type previewQuoteJSON struct {
 	LineItems         []PreviewLineItem           `json:"line_items"`
 	IsDashPassApplied bool                        `json:"is_dashpass_applied"`
@@ -256,30 +265,25 @@ type previewQuoteJSON struct {
 	StoreOrderCart    *previewStoreOrderCartJSON  `json:"store_order_cart"`
 }
 
-// previewDeliveryAddressJSON holds the printable address on the quote.
 type previewDeliveryAddressJSON struct {
 	PrintableAddress string `json:"printable_address"`
 }
 
-// previewStoreOrderCartJSON holds fulfillment mode and nested store orders.
 type previewStoreOrderCartJSON struct {
-	FulfillmentType string                     `json:"fulfillment_type"`
-	Orders          []previewStoreOrderJSON    `json:"orders"`
+	FulfillmentType string                  `json:"fulfillment_type"`
+	Orders          []previewStoreOrderJSON `json:"orders"`
 }
 
-// previewStoreOrderJSON is one store order inside the cart quote.
 type previewStoreOrderJSON struct {
 	OrderItems []previewOrderItemJSON `json:"order_items"`
 }
 
-// previewOrderItemJSON is one line item inside a store order.
 type previewOrderItemJSON struct {
 	Quantity                int                     `json:"quantity"`
 	UnitPriceMonetaryFields *MoneyAmount            `json:"unit_price_monetary_fields"`
 	Item                    *previewCatalogItemJSON `json:"item"`
 }
 
-// previewCatalogItemJSON is the catalog item nested under an order line.
 type previewCatalogItemJSON struct {
 	Name string `json:"name"`
 }
@@ -305,7 +309,12 @@ func (client *CLIClient) PreviewOrder(ctx context.Context, intentText string, ca
 		return nil, fmt.Errorf("ddcli: cartUUID is required")
 	}
 
-	cliStdout, err := client.RunCLICommand(ctx, "order", "preview", "--cart-uuid", cartUUID, "--intent", intentText)
+	cliStdout, err := client.RunCLICommand(
+		ctx,
+		"order", "preview",
+		"--cart-uuid", cartUUID,
+		"--intent", intentText,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -314,6 +323,7 @@ func (client *CLIClient) PreviewOrder(ctx context.Context, intentText string, ca
 	if err := decodeStructuredContent(cliStdout, &rawPreview); err != nil {
 		return nil, err
 	}
+
 	if !rawPreview.Success {
 		failureMessage := rawPreview.Message
 		if failureMessage == "" {
@@ -331,30 +341,40 @@ func (client *CLIClient) PreviewOrder(ctx context.Context, intentText string, ca
 		CartUUID: rawPreview.CartUUID,
 		Message:  rawPreview.Message,
 	}
-	if rawPreview.Quote == nil {
-		return previewResult, nil
-	}
-
-	previewResult.Quote.LineItems = rawPreview.Quote.LineItems
-	previewResult.Quote.IsDashPassApplied = rawPreview.Quote.IsDashPassApplied
-	previewResult.Quote.NetTotalBeforeTip = rawPreview.Quote.NetTotalBeforeTip
-	if rawPreview.Quote.DeliveryAddress != nil {
-		previewResult.Quote.DeliveryAddress = rawPreview.Quote.DeliveryAddress.PrintableAddress
-	}
-	if rawPreview.Quote.StoreOrderCart != nil {
-		previewResult.Quote.FulfillmentType = rawPreview.Quote.StoreOrderCart.FulfillmentType
-		for _, storeOrder := range rawPreview.Quote.StoreOrderCart.Orders {
-			for _, orderItem := range storeOrder.OrderItems {
-				quoteItem := PreviewQuoteItem{Quantity: orderItem.Quantity}
-				if orderItem.Item != nil {
-					quoteItem.Name = orderItem.Item.Name
-				}
-				if orderItem.UnitPriceMonetaryFields != nil {
-					quoteItem.UnitPriceDisplay = orderItem.UnitPriceMonetaryFields.DisplayString
-				}
-				previewResult.Quote.Items = append(previewResult.Quote.Items, quoteItem)
-			}
-		}
+	if rawPreview.Quote != nil {
+		previewResult.Quote = simplifyPreviewQuote(rawPreview.Quote)
 	}
 	return previewResult, nil
+}
+
+// simplifyPreviewQuote copies nested CLI quote JSON into the flatter PreviewOrderQuote.
+func simplifyPreviewQuote(rawQuote *previewQuoteJSON) PreviewOrderQuote {
+	quote := PreviewOrderQuote{
+		LineItems:         rawQuote.LineItems,
+		IsDashPassApplied: rawQuote.IsDashPassApplied,
+		NetTotalBeforeTip: rawQuote.NetTotalBeforeTip,
+	}
+
+	if rawQuote.DeliveryAddress != nil {
+		quote.DeliveryAddress = rawQuote.DeliveryAddress.PrintableAddress
+	}
+
+	if rawQuote.StoreOrderCart == nil {
+		return quote
+	}
+
+	quote.FulfillmentType = rawQuote.StoreOrderCart.FulfillmentType
+	for _, storeOrder := range rawQuote.StoreOrderCart.Orders {
+		for _, orderItem := range storeOrder.OrderItems {
+			quoteItem := PreviewQuoteItem{Quantity: orderItem.Quantity}
+			if orderItem.Item != nil {
+				quoteItem.Name = orderItem.Item.Name
+			}
+			if orderItem.UnitPriceMonetaryFields != nil {
+				quoteItem.UnitPriceDisplay = orderItem.UnitPriceMonetaryFields.DisplayString
+			}
+			quote.Items = append(quote.Items, quoteItem)
+		}
+	}
+	return quote
 }

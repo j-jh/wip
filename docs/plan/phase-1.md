@@ -39,7 +39,7 @@ flowchart LR
   preview --> stopNode[Stop_before_pay_submit]
 ```
 
-Caller responsibilities (in `cmd/server` or later HTTP):
+Caller responsibilities (in `cmd/reorder-preview` or later HTTP):
 
 1. Call `ListOrderHistory` (wide enough `--days` / `--max`).
 2. Choose an order with `IsReorderable == true`.
@@ -83,14 +83,15 @@ Caller responsibilities (in `cmd/server` or later HTTP):
 
 ```
 wip/
-├── plan/phase-1.md             ← this file
-├── cmd/server/main.go          ← runReorderFlow() + optional address probe
+├── docs/plan/phase-1.md              ← this file
+├── cmd/list-addresses/main.go        ← quick-win address read
+├── cmd/reorder-preview/main.go       ← runReorderFlow() through preview
 └── internal/ddcli/
-    ├── client.go
-    ├── address.go              ← ListDeliveryAddresses
-    ├── stores.go               ← FindNearbyStores (later grocery)
-    ├── order.go                ← ListOrderHistory, ReorderPastOrder, PreviewOrder
-    └── cart.go                 ← ListOpenCarts
+    ├── client.go                     ← start here (plumbing)
+    ├── address.go                    ← ListDeliveryAddresses
+    ├── stores.go                     ← FindNearbyStores (later grocery)
+    ├── order.go                      ← ListOrderHistory, ReorderPastOrder, PreviewOrder
+    └── cart.go                       ← ListOpenCarts
 ```
 
 ---
@@ -100,8 +101,8 @@ wip/
 1. **`ListOpenCarts`** — read-only; optional `storeID` (omit when empty).
 2. **`ReorderPastOrder(ctx, intentText, orderUUID)`** — mutation; return new cart uuid.
 3. **`PreviewOrder(ctx, intentText, cartUUID)`** — read quote; cart uuid + intent only at first.
-4. **`runReorderFlow` in `cmd/server`** — history → first reorderable → cart check → reorder (or reuse open cart) → preview → stop.
-5. Keep `runListDeliveryAddresses` as an optional quick-win probe.
+4. **`runReorderFlow` in `cmd/reorder-preview`** — history → first reorderable → cart check → reorder (or reuse open cart) → preview → stop.
+5. Keep `cmd/list-addresses` as a separate quick-win probe.
 
 ---
 
@@ -110,7 +111,7 @@ wip/
 - Descriptive Go names; JSON wire tags match CLI.
 - `context.Context` on every call; omit empty optional flags.
 - Decode `structuredContent`; treat `success: false` / `isError` as errors.
-- Docs comments follow [docs/function-docs.md](../docs/function-docs.md).
+- Docs comments follow [docs/function-docs.md](../function-docs.md).
 
 ---
 
@@ -120,9 +121,9 @@ wip/
 - [x] `ListOpenCarts`
 - [x] `ReorderPastOrder`
 - [x] `PreviewOrder`
-- [x] `runReorderFlow` demo that stops after preview (no payment / submit)
+- [x] `cmd/reorder-preview` demo that stops after preview (no payment / submit)
 - [x] No payment APIs in the package
-- [x] Plan lives at `plan/phase-1.md` (reorder-first)
+- [x] Plan lives at `docs/plan/phase-1.md` (reorder-first)
 
 ---
 

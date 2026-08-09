@@ -13,10 +13,10 @@ import (
 //   - MaxStores (int) — max stores to return. Zero omits the flag (CLI default 10).
 //   - Latitude / Longitude (*float64) — override search location. Nil omits (CLI uses default delivery address).
 type FindNearbyStoresOptions struct {
-	Vertical   string
-	MaxStores  int
-	Latitude   *float64
-	Longitude  *float64
+	Vertical  string
+	MaxStores int
+	Latitude  *float64
+	Longitude *float64
 }
 
 // NearbyStore is one non-restaurant store from find-nearby-stores.
@@ -76,6 +76,7 @@ func (client *CLIClient) FindNearbyStores(ctx context.Context, intentText string
 	}
 
 	cliArgs := []string{"find-nearby-stores", "--intent", intentText}
+	// Only add optional flags when the caller provided a value (zero/empty/nil = CLI default).
 	if options.Vertical != "" {
 		cliArgs = append(cliArgs, "--vertical", options.Vertical)
 	}
@@ -83,10 +84,9 @@ func (client *CLIClient) FindNearbyStores(ctx context.Context, intentText string
 		cliArgs = append(cliArgs, "--max", strconv.Itoa(options.MaxStores))
 	}
 	if options.Latitude != nil && options.Longitude != nil {
-		cliArgs = append(cliArgs,
-			"--lat", strconv.FormatFloat(*options.Latitude, 'f', -1, 64),
-			"--lng", strconv.FormatFloat(*options.Longitude, 'f', -1, 64),
-		)
+		latitudeText := strconv.FormatFloat(*options.Latitude, 'f', -1, 64)
+		longitudeText := strconv.FormatFloat(*options.Longitude, 'f', -1, 64)
+		cliArgs = append(cliArgs, "--lat", latitudeText, "--lng", longitudeText)
 	}
 
 	cliStdout, err := client.RunCLICommand(ctx, cliArgs...)
@@ -98,6 +98,7 @@ func (client *CLIClient) FindNearbyStores(ctx context.Context, intentText string
 	if err := decodeStructuredContent(cliStdout, &nearbyStoresResult); err != nil {
 		return nil, err
 	}
+
 	if !nearbyStoresResult.Success {
 		failureMessage := nearbyStoresResult.Message
 		if failureMessage == "" {
@@ -105,5 +106,6 @@ func (client *CLIClient) FindNearbyStores(ctx context.Context, intentText string
 		}
 		return &nearbyStoresResult, fmt.Errorf("ddcli: %s", failureMessage)
 	}
+
 	return &nearbyStoresResult, nil
 }

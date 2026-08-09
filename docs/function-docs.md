@@ -33,7 +33,7 @@ Notes: (optional) CLI command, auth, side effects, omit if none
 When implementing or documenting wrappers, keep the **syntax, comments, and control flow** easy to follow:
 
 - **Straight-line flow** — validate → run CLI → decode → check `success` → return. Avoid clever nesting, early-return puzzles, or dense one-liners.
-- **Names over abbreviations** — spell out what a value is (`intentText`, `addressListResult`), not `it` / `res` / `o`.
+- **Names over abbreviations** — spell out what a value is (`intentText`, `orderHistoryResult`), not `it` / `res` / `o`.
 - **Comments teach** — briefly explain Go or domain concepts a newcomer might not know (`context.Context` for cancel/timeout, why intent is required, what `structuredContent` is). Do not restate the next line of code.
 - **One idea per step** — each block does one job so a reader can skim top to bottom without jumping.
 - **Docs match the code** — param/return names in this comment shape should be the same identifiers used in the function signature.

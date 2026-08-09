@@ -32,13 +32,13 @@ type OpenCartItem struct {
 //   - CreatedAtMs (int64) — epoch ms; may be zero
 //   - UpdatedAtMs (int64) — epoch ms; may be zero
 type OpenCart struct {
-	CartUUID   string         `json:"cart_uuid"`
-	StoreID    string         `json:"store_id"`
-	StoreName  string         `json:"store_name"`
-	Items      []OpenCartItem `json:"items"`
-	ItemsCount int            `json:"items_count"`
-	CreatedAtMs int64         `json:"created_at"`
-	UpdatedAtMs int64         `json:"updated_at"`
+	CartUUID    string         `json:"cart_uuid"`
+	StoreID     string         `json:"store_id"`
+	StoreName   string         `json:"store_name"`
+	Items       []OpenCartItem `json:"items"`
+	ItemsCount  int            `json:"items_count"`
+	CreatedAtMs int64          `json:"created_at"`
+	UpdatedAtMs int64          `json:"updated_at"`
 }
 
 // ListOpenCartsResult is the structuredContent payload for cart list.
@@ -72,6 +72,7 @@ func (client *CLIClient) ListOpenCarts(ctx context.Context, intentText string, s
 	}
 
 	cliArgs := []string{"cart", "list", "--intent", intentText}
+	// Only add optional flags when the caller provided a value (zero/empty = CLI default).
 	if storeID != "" {
 		cliArgs = append(cliArgs, "--store-id", storeID)
 	}
@@ -85,6 +86,7 @@ func (client *CLIClient) ListOpenCarts(ctx context.Context, intentText string, s
 	if err := decodeStructuredContent(cliStdout, &openCartsResult); err != nil {
 		return nil, err
 	}
+
 	if !openCartsResult.Success {
 		failureMessage := openCartsResult.Message
 		if failureMessage == "" {
@@ -92,5 +94,6 @@ func (client *CLIClient) ListOpenCarts(ctx context.Context, intentText string, s
 		}
 		return &openCartsResult, fmt.Errorf("ddcli: %s", failureMessage)
 	}
+
 	return &openCartsResult, nil
 }
