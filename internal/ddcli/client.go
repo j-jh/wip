@@ -1,3 +1,7 @@
+// Package ddcli wraps the DoorDash terminal CLI (`dd-cli`) as typed Go methods.
+//
+// Pattern for every command: build argv → run subprocess → decode JSON → check success.
+// Callers should use methods like ListDeliveryAddresses, not RunCLICommand directly.
 package ddcli
 
 import (
@@ -21,6 +25,7 @@ type CLIClient struct {
 	BinaryPath string
 }
 
+// resolveCLIBinaryPath picks which binary to exec: field → env → default name on PATH.
 func (client *CLIClient) resolveCLIBinaryPath() string {
 	if client != nil && client.BinaryPath != "" {
 		return client.BinaryPath
@@ -40,6 +45,8 @@ func (client *CLIClient) resolveCLIBinaryPath() string {
 // Returns:
 //   - string — formatted intent ready to pass as --intent
 func BuildIntent(summary, userPrompt string) string {
+	// strings.Builder is the usual Go way to build a string in pieces without
+	// creating many temporary strings along the way.
 	var intentBuilder strings.Builder
 	intentBuilder.WriteString("Summary: ")
 	intentBuilder.WriteString(summary)
@@ -63,12 +70,16 @@ func BuildIntent(summary, userPrompt string) string {
 //
 // Notes: low-level helper. Prefer typed methods like ListDeliveryAddresses for callers.
 func (client *CLIClient) RunCLICommand(ctx context.Context, cliArgs ...string) ([]byte, error) {
-	argsWithJSONOutput := make([]string, 0, len(cliArgs)+1)
-	argsWithJSONOutput = append(argsWithJSONOutput, "--json-output")
-	argsWithJSONOutput = append(argsWithJSONOutput, cliArgs...)
+	// Always ask for JSON so every wrapper can decode the same envelope shape.
+	commandArgs := make([]string, 0, len(cliArgs)+1)
+	commandArgs = append(commandArgs, "--json-output")
+	commandArgs = append(commandArgs, cliArgs...)
 
-	cliCommand := exec.CommandContext(ctx, client.resolveCLIBinaryPath(), argsWithJSONOutput...)
-	var stdoutBuffer, stderrBuffer bytes.Buffer
+	// CommandContext stops the process if ctx is canceled or times out.
+	cliCommand := exec.CommandContext(ctx, client.resolveCLIBinaryPath(), commandArgs...)
+
+	var stdoutBuffer bytes.Buffer
+	var stderrBuffer bytes.Buffer
 	cliCommand.Stdout = &stdoutBuffer
 	cliCommand.Stderr = &stderrBuffer
 
@@ -82,14 +93,17 @@ func (client *CLIClient) RunCLICommand(ctx context.Context, cliArgs ...string) (
 		if errorMessage == "" {
 			errorMessage = runErr.Error()
 		}
+		// %w keeps the original exit error available to errors.Is / errors.As.
 		return trimmedStdout, fmt.Errorf("ddcli: %w: %s", runErr, errorMessage)
 	}
 	return trimmedStdout, nil
 }
 
-// cliJSONOutputEnvelope is the outer --json-output shape from dd-cli.
-// The command payload lives under structuredContent.
+// cliJSONOutputEnvelope is the outer --json-output wrapper from dd-cli.
+// The real command payload is inside StructuredContent (another JSON object).
 type cliJSONOutputEnvelope struct {
+	// json.RawMessage delays parsing so we can unmarshal StructuredContent
+	// into a different Go type per command.
 	StructuredContent json.RawMessage `json:"structuredContent"`
 	IsError           bool            `json:"isError"`
 }

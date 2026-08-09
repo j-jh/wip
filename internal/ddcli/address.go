@@ -59,6 +59,8 @@ func (client *CLIClient) ListDeliveryAddresses(ctx context.Context, intentText s
 	if err := decodeStructuredContent(cliStdout, &addressListResult); err != nil {
 		return nil, err
 	}
+
+	// CLI can exit 0 but still report failure inside the JSON payload.
 	if !addressListResult.Success {
 		failureMessage := addressListResult.Message
 		if failureMessage == "" {
@@ -66,5 +68,6 @@ func (client *CLIClient) ListDeliveryAddresses(ctx context.Context, intentText s
 		}
 		return &addressListResult, fmt.Errorf("ddcli: %s", failureMessage)
 	}
+
 	return &addressListResult, nil
 }

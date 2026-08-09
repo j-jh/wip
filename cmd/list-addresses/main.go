@@ -1,3 +1,7 @@
+// Command list-addresses prints saved DoorDash delivery addresses.
+//
+// Run: go run ./cmd/list-addresses
+// Needs: dd-cli on PATH (or DD_CLI_BIN) and a prior `dd-cli login`.
 package main
 
 import (
@@ -10,11 +14,8 @@ import (
 
 func main() {
 	doorDashClient := &ddcli.CLIClient{}
-	runListDeliveryAddresses(doorDashClient)
-}
 
-// runListDeliveryAddresses prints saved delivery addresses via ListDeliveryAddresses.
-func runListDeliveryAddresses(doorDashClient *ddcli.CLIClient) {
+	// context.Background() is a non-cancelable context — fine for a short demo script.
 	addressListResult, err := doorDashClient.ListDeliveryAddresses(
 		context.Background(),
 		ddcli.BuildIntent(
