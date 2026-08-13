@@ -5,8 +5,9 @@
 //	go run ./cmd/add-cart-items \
 //	  -store-id 123 -menu-id 456 -item-id 789 -item-name "Pad Thai" -quantity 1
 //
-// Optional: -cart-uuid (append to existing), -fulfillment delivery|pickup (new carts only).
-// Needs dd-cli login. Pre-check with list-open-carts -store-id …
+// Optional: -cart-uuid (must still be open), -fulfillment delivery|pickup (new carts only).
+// Needs dd-cli login. If an open cart already exists at the store, add reuses that session
+// (even when -cart-uuid is omitted or points at a deleted cart).
 package main
 
 import (

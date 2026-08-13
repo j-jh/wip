@@ -1,5 +1,41 @@
 # wip
 
+Rough Plan:
+
+Problem statements: 
+1. What's the balance between agent automation and human intervention?
+2. How do we provide a non chatbox based UI?
+3. When does the agent ask vs assume?
+4. What separates this from another llm wrapper over a traditional backend?
+
+Deterministic:
+1. Backend wrappers over dd-cli commands
+    a. Functions for:
+        a. Search for... select restaurant 
+        b. Add to cart (req. modifiers, notes)
+        c. Checkout/payment
+        d. 
+2. Human prompting interactions for each above dd based flow step (no llm)
+
+Agentified:
+3. Gradually introduce llm... (AI takeover)
+    a. Search flow: find me (cuisine/category) 
+        1. Agent decides where to order?
+    b. Single item flow: add item with required and optional modifiers + notes to my cart
+        1. Agent decides what to add/modify?
+    c. Ordering flow: repeat b. for given list of items, checkout 
+        1. Agent decides the whole cart state?
+
+What must/must not be automated? Full intent understanding, tool routing...Agentify process? Memory? User habits and recommendations?
+
+Human determinism reduces as we progress down this chain.
+
+Reorder flow: low intervention, stable demoable path to checkout.
+
+New restaraunt: high human in the loop intervention by design until LLM implementation
+
+-----
+
 Learning project: thin Go wrappers around `dd-cli`, plus small demos you can run.
 
 ## Layout
@@ -7,38 +43,104 @@ Learning project: thin Go wrappers around `dd-cli`, plus small demos you can run
 ```text
 wip/
 ├── cmd/                      ← runnable demos (one idea each)
-│   ├── list-addresses/       ← simplest read
-│   └── reorder-preview/      ← phase-1 flow through quote (no charge)
+│   ├── list-addresses/
+│   ├── reorder-preview/      ← combined reorder → preview
+│   ├── search-restaurants/   ← tier-2 manual step
+│   ├── get-menu/
+│   ├── list-open-carts/
+│   ├── add-cart-items/
+│   └── preview-order/
 ├── internal/ddcli/           ← shared CLI adapter (start with client.go)
-│   ├── client.go             ← RunCLICommand, BuildIntent, JSON envelope
-│   ├── address.go
-│   ├── cart.go
-│   ├── order.go
-│   └── stores.go
 └── docs/
-    ├── wip.md                ← what exists today
-    ├── function-docs.md      ← comment / naming style (Go-learner friendly)
+    ├── wip.md
+    ├── function-docs.md
     └── plan/
-        ├── tier-1-reads.md   ← early read-only roadmap (simple-read)
-        └── phase-1.md        ← reorder → preview plan
 ```
 
 Local-only (gitignored): `self-docs/`, `agent-ref/`, `.env`.
 
-## Suggested reading order
-
-1. `internal/ddcli/client.go` — how every command is run and decoded  
-2. `internal/ddcli/address.go` — smallest wrapper  
-3. `cmd/list-addresses` — smallest caller  
-4. `internal/ddcli/order.go` + `cart.go` — reorder / preview  
-5. `cmd/reorder-preview` — multi-step flow  
-
-## Run demos
+## Prerequisites
 
 ```bash
-dd-cli login   # once
-go run ./cmd/list-addresses
-go run ./cmd/reorder-preview
+dd-cli login          # once, and again when the token expires
+go version            # Go 1.22+ (see go.mod)
 ```
 
-Optional: set `DD_CLI_BIN` if `dd-cli` is not on your PATH.
+Optional: `export DD_CLI_BIN=/path/to/dd-cli` if the binary is not on your `PATH`.
+
+## How to run
+
+All commands are run from the repo root.
+
+### Tier 1 (already combined)
+
+```bash
+go run ./cmd/list-addresses
+go run ./cmd/reorder-preview    # history → cart check → reorder → preview (no charge)
+```
+
+### Tier 2 restaurant → preview (manual steps)
+
+Run **one command at a time**. Copy IDs from each command’s output into the next flags. Do not submit/pay here.
+
+**1. Search restaurants** → note a `store_id`
+
+```bash
+go run ./cmd/search-restaurants -query "thai" -limit 5
+
+# optional location override (both required together):
+go run ./cmd/search-restaurants -query "thai" -limit 5 -lat 37.76 -lng -122.48
+```
+
+**2. Get menu** → note `menu_id` and an `item_id` / name (prefer a simple item)
+
+```bash
+go run ./cmd/get-menu -store-id STORE_ID
+```
+
+**3. List open carts** → check for an existing cart at that store (one open cart per store)
+
+```bash
+go run ./cmd/list-open-carts
+go run ./cmd/list-open-carts -store-id STORE_ID
+```
+
+**4. Add one item** → note `cart_uuid`
+
+```bash
+go run ./cmd/add-cart-items \
+  -store-id STORE_ID \
+  -menu-id MENU_ID \
+  -item-id ITEM_ID \
+  -item-name "Item Name" \
+  -quantity 1
+
+# optional: append to an existing cart, or set fulfillment on create
+go run ./cmd/add-cart-items \
+  -store-id STORE_ID -menu-id MENU_ID \
+  -item-id ITEM_ID -item-name "Item Name" -quantity 1 \
+  -cart-uuid CART_UUID \
+  -fulfillment pickup
+```
+
+**5. Preview quote** (no charge)
+
+```bash
+go run ./cmd/preview-order -cart-uuid CART_UUID
+```
+
+### Flag cheat sheet
+
+| Command | Required flags | Optional |
+|---------|----------------|----------|
+| `search-restaurants` | `-query` | `-limit`, `-lat`+`-lng` |
+| `get-menu` | `-store-id` | — |
+| `list-open-carts` | — | `-store-id` |
+| `add-cart-items` | `-store-id`, `-menu-id`, `-item-id`, `-item-name` | `-quantity`, `-cart-uuid`, `-fulfillment` |
+| `preview-order` | `-cart-uuid` | — |
+
+## Suggested reading order
+
+1. `internal/ddcli/client.go`  
+2. `internal/ddcli/address.go` + `cmd/list-addresses`  
+3. Tier-2 wrappers: `search.go` → `menu.go` → `cart.go` (`AddCartItems`) → `order.go` (`PreviewOrder`)  

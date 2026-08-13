@@ -117,8 +117,8 @@ type CartAddItem struct {
 //   - StoreID (string) — required store id
 //   - MenuID (string) — required menu id (from GetMenu)
 //   - Items ([]CartAddItem) — required; at least one item
-//   - CartUUID (string) — optional existing cart; empty creates/appends per CLI rules
-//   - Fulfillment (string) — optional "delivery" or "pickup"; only applies when creating a cart
+//   - CartUUID (string) — preferred open cart; if empty/dead, reuses any open cart at store
+//   - Fulfillment (string) — optional "delivery" or "pickup"; only when creating a new cart
 type AddCartItemsOptions struct {
 	StoreID     string
 	MenuID      string
@@ -161,7 +161,10 @@ type AddCartItemsResult struct {
 //   - error — missing args, CLI failure, bad JSON, or success:false from CLI
 //
 // Notes: runs `dd-cli --json-output cart add-items …`. Mutation.
-// Pre-flight with ListOpenCarts(storeID): one open cart per store.
+// Always lists open carts for the store first:
+//   - if CartUUID is still open → use it
+//   - else if any open cart exists → reuse that session (never a deleted uuid)
+//   - else → create a new cart (omit --cart-uuid)
 func (client *CLIClient) AddCartItems(ctx context.Context, intentText string, options AddCartItemsOptions) (*AddCartItemsResult, error) {
 	if intentText == "" {
 		return nil, fmt.Errorf("ddcli: intent is required")
@@ -176,6 +179,11 @@ func (client *CLIClient) AddCartItems(ctx context.Context, intentText string, op
 		return nil, fmt.Errorf("ddcli: items are required")
 	}
 
+	cartUUID, err := client.resolveCartUUIDForAdd(ctx, intentText, options.StoreID, options.CartUUID)
+	if err != nil {
+		return nil, err
+	}
+
 	itemsJSON, err := json.Marshal(options.Items)
 	if err != nil {
 		return nil, fmt.Errorf("ddcli: encode items-json: %w", err)
@@ -188,10 +196,11 @@ func (client *CLIClient) AddCartItems(ctx context.Context, intentText string, op
 		"--items-json", string(itemsJSON),
 		"--intent", intentText,
 	}
-	if options.CartUUID != "" {
-		cliArgs = append(cliArgs, "--cart-uuid", options.CartUUID)
+	if cartUUID != "" {
+		cliArgs = append(cliArgs, "--cart-uuid", cartUUID)
 	}
-	if options.Fulfillment != "" {
+	// Fulfillment only applies when creating a cart (no open session / no cart uuid).
+	if cartUUID == "" && options.Fulfillment != "" {
 		cliArgs = append(cliArgs, "--fulfillment", options.Fulfillment)
 	}
 
@@ -214,4 +223,83 @@ func (client *CLIClient) AddCartItems(ctx context.Context, intentText string, op
 	}
 
 	return &addItemsResult, nil
+}
+
+// resolveCartUUIDForAdd picks which cart session to use for add-items.
+// Prefers a still-open requested uuid; otherwise reuses any open cart at the store;
+// empty means "create a new cart".
+func (client *CLIClient) resolveCartUUIDForAdd(ctx context.Context, intentText string, storeID string, requestedCartUUID string) (string, error) {
+	openCartsResult, err := client.ListOpenCarts(ctx, intentText, storeID)
+	if err != nil {
+		return "", fmt.Errorf("ddcli: preflight open carts: %w", err)
+	}
+
+	if requestedCartUUID != "" {
+		for _, openCart := range openCartsResult.Carts {
+			if openCart.CartUUID == requestedCartUUID {
+				return requestedCartUUID, nil
+			}
+		}
+		// Requested uuid is dead / wrong store — fall through to any open session.
+	}
+
+	if len(openCartsResult.Carts) > 0 {
+		return openCartsResult.Carts[0].CartUUID, nil
+	}
+
+	return "", nil
+}
+
+// DeleteCartResult is the structuredContent payload for cart delete.
+//
+// Fields:
+//   - Success (bool) — CLI reported success
+//   - Message (string) — optional status / error text
+//   - CartUUID (string) — cart that was cleared (treat as invalid afterward)
+type DeleteCartResult struct {
+	Success  bool   `json:"success"`
+	Message  string `json:"message,omitempty"`
+	CartUUID string `json:"cart_uuid"`
+}
+
+// DeleteCart empties a cart and abandons it (CLI "close" / clear).
+//
+// Params:
+//   - ctx (context.Context) — cancel / timeout for the CLI call
+//   - intentText (string) — required DoorDash intent blob; use BuildIntent() to build it
+//   - cartUUID (string) — open cart from add-items / reorder / list
+//
+// Returns:
+//   - *DeleteCartResult — cleared cart_uuid on success
+//   - error — missing args, CLI failure, bad JSON, or success:false from CLI
+//
+// Notes: runs `dd-cli --json-output cart delete --cart-uuid …`. Mutation.
+// After success, treat cartUUID as invalid — create a new cart with AddCartItems (no --cart-uuid).
+func (client *CLIClient) DeleteCart(ctx context.Context, intentText string, cartUUID string) (*DeleteCartResult, error) {
+	if intentText == "" {
+		return nil, fmt.Errorf("ddcli: intent is required")
+	}
+	if cartUUID == "" {
+		return nil, fmt.Errorf("ddcli: cartUUID is required")
+	}
+
+	cliStdout, err := client.RunCLICommand(ctx, "cart", "delete", "--cart-uuid", cartUUID, "--intent", intentText)
+	if err != nil {
+		return nil, err
+	}
+
+	var deleteCartResult DeleteCartResult
+	if err := decodeStructuredContent(cliStdout, &deleteCartResult); err != nil {
+		return nil, err
+	}
+
+	if !deleteCartResult.Success {
+		failureMessage := deleteCartResult.Message
+		if failureMessage == "" {
+			failureMessage = "cart delete failed"
+		}
+		return &deleteCartResult, fmt.Errorf("ddcli: %s", failureMessage)
+	}
+
+	return &deleteCartResult, nil
 }
