@@ -2,7 +2,11 @@
 
 Rough Plan:
 
-Problem statement: what's the balance between agent automation and human intervention?
+Problem statements: 
+1. What's the balance between agent automation and human intervention?
+2. How do we provide a non chatbox based UI?
+3. When does the agent ask vs assume?
+4. What separates this from another llm wrapper over a traditional backend?
 
 Deterministic:
 1. Backend wrappers over dd-cli commands
