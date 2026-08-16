@@ -36,6 +36,28 @@ func (client *CLIClient) resolveCLIBinaryPath() string {
 	return defaultCLIBinaryName
 }
 
+// Login runs `dd-cli login` (browser sign-in). No --json-output — this is interactive.
+//
+// Params:
+//   - ctx (context.Context) — cancel / timeout for the subprocess
+//
+// Returns:
+//   - error — non-zero exit from the login command
+//
+// Notes: attaches stdin/stdout/stderr so the user can complete the browser flow.
+// Later commands reuse credentials saved in the OS keychain.
+func (client *CLIClient) Login(ctx context.Context) error {
+	cliCommand := exec.CommandContext(ctx, client.resolveCLIBinaryPath(), "login")
+	cliCommand.Stdin = os.Stdin
+	cliCommand.Stdout = os.Stdout
+	cliCommand.Stderr = os.Stderr
+
+	if err := cliCommand.Run(); err != nil {
+		return fmt.Errorf("ddcli: login failed: %w", err)
+	}
+	return nil
+}
+
 // BuildIntent formats the --intent string required by most dd-cli service commands.
 //
 // Params:
