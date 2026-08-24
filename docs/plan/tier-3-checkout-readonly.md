@@ -28,9 +28,9 @@ Branch: `feat/tier-3-checkout-readonly`.
 
 ## Checklist
 
-- [ ] `ListPaymentMethods` wrapper in `internal/ddcli/payment.go`
-- [ ] `cmd/list-payment-methods` demo
-- [ ] README + `docs/wip.md` updated
+- [x] `ListPaymentMethods` wrapper in `internal/ddcli/payment.go`
+- [x] `cmd/list-payment-methods` demo
+- [x] README + `docs/wip.md` updated
 - [ ] Manual test after `restaurant-preview` (logged-in account)
 
 ---

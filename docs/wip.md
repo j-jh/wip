@@ -15,8 +15,8 @@ Function comment style: [function-docs.md](function-docs.md).
   - `cmd/search-restaurants`, `cmd/get-menu`, `cmd/list-open-carts`
   - `cmd/add-cart-items`, `cmd/preview-order`, `cmd/delete-cart`
   - `cmd/restaurant-preview` — interactive login → search → menu → add → preview
-- Tier 3 (starting): `cmd/list-payment-methods` (planned)
+- Tier 3 (starting): `cmd/list-payment-methods`
 
 ## Implemented wrappers
 
-`ListDeliveryAddresses`, `ListOrderHistory`, `FindNearbyStores`, `ListOpenCarts`, `ReorderPastOrder`, `PreviewOrder`, `SearchRestaurants`, `GetMenu`, `AddCartItems`, `DeleteCart`
+`ListDeliveryAddresses`, `ListOrderHistory`, `FindNearbyStores`, `ListOpenCarts`, `ReorderPastOrder`, `PreviewOrder`, `SearchRestaurants`, `GetMenu`, `AddCartItems`, `DeleteCart`, `ListPaymentMethods`
