@@ -11,15 +11,15 @@ import (
 //   - PaymentMethodID (string) — id for future payment commands
 //   - Last4 (string) — masked last 4 digits
 //   - Brand (string) — Visa / Mastercard / etc. (best-effort)
-//   - ExpMonth (int) — expiry month (best-effort; zero when unset)
-//   - ExpYear (int) — expiry year (best-effort; zero when unset)
+//   - ExpMonth (string) — expiry month (best-effort; empty when unset)
+//   - ExpYear (string) — expiry year (best-effort; empty when unset)
 //   - ProviderPaymentMethodID (string) — external provider id (best-effort)
 type PaymentCard struct {
 	PaymentMethodID           string `json:"payment_method_id"`
 	Last4                     string `json:"last4"`
 	Brand                     string `json:"brand"`
-	ExpMonth                  int    `json:"exp_month"`
-	ExpYear                   int    `json:"exp_year"`
+	ExpMonth                  string `json:"exp_month"`
+	ExpYear                   string `json:"exp_year"`
 	ProviderPaymentMethodID   string `json:"provider_payment_method_id,omitempty"`
 }
 

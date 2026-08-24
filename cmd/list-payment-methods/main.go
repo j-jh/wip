@@ -37,7 +37,7 @@ func main() {
 		if card.PaymentMethodID != "" && card.PaymentMethodID == defaultID {
 			marker = " (default)"
 		}
-		fmt.Printf("%s %s •••• %s exp %02d/%d%s\n",
+		fmt.Printf("%s %s •••• %s exp %s/%s%s\n",
 			card.PaymentMethodID,
 			card.Brand,
 			card.Last4,
