@@ -49,7 +49,9 @@ wip/
 │   ├── get-menu/
 │   ├── list-open-carts/
 │   ├── add-cart-items/
-│   └── preview-order/
+│   ├── preview-order/
+│   ├── delete-cart/
+│   └── restaurant-preview/   ← interactive combined flow (prompts)
 ├── internal/ddcli/           ← shared CLI adapter (start with client.go)
 └── docs/
     ├── wip.md
@@ -77,6 +79,15 @@ All commands are run from the repo root.
 ```bash
 go run ./cmd/list-addresses
 go run ./cmd/reorder-preview    # history → cart check → reorder → preview (no charge)
+```
+
+### Tier 2 restaurant → preview (interactive combined)
+
+Prompts at each step; stops after quote (no charge). Open-cart reuse is inside `AddCartItems`.
+
+```bash
+go run ./cmd/restaurant-preview
+# typical prompts: query, max results, lat,lng (e.g. 37.76,-122.48), store #, item #, qty, pickup
 ```
 
 ### Tier 2 restaurant → preview (manual steps)
