@@ -1,6 +1,42 @@
 # wip
 
-Learning project: thin Go wrappers around DoorDash beta **`dd-cli`**, plus small demos you can run. Checkout stays **human-confirmed**; no direct DoorDash HTTP; no LLM yet.
+Rough Plan:
+
+Problem statements: 
+1. What's the balance between agent automation and human intervention?
+2. How do we provide a non chatbox based UI?
+3. When does the agent ask vs assume?
+4. What separates this from another llm wrapper over a traditional backend?
+
+Deterministic:
+1. Backend wrappers over dd-cli commands
+    a. Functions for:
+        a. Search for... select restaurant 
+        b. Add to cart (req. modifiers, notes)
+        c. Checkout/payment
+        d. 
+2. Human prompting interactions for each above dd based flow step (no llm)
+
+Agentified:
+3. Gradually introduce llm... (AI takeover)
+    a. Search flow: find me (cuisine/category) 
+        1. Agent decides where to order?
+    b. Single item flow: add item with required and optional modifiers + notes to my cart
+        1. Agent decides what to add/modify?
+    c. Ordering flow: repeat b. for given list of items, checkout 
+        1. Agent decides the whole cart state?
+
+What must/must not be automated? Full intent understanding, tool routing...Agentify process? Memory? User habits and recommendations?
+
+Human determinism reduces as we progress down this chain.
+
+Reorder flow: low intervention, stable demoable path to checkout.
+
+New restaraunt: high human in the loop intervention by design until LLM implementation
+
+-----
+
+Learning project: thin Go wrappers around `dd-cli`, plus small demos you can run.
 
 ## Progress
 
