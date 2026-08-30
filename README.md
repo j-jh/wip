@@ -1,42 +1,18 @@
 # wip
 
-Rough Plan:
+Learning project: thin Go wrappers around DoorDash beta **`dd-cli`**, plus small demos you can run. Checkout stays **human-confirmed**; no direct DoorDash HTTP; no LLM yet.
 
-Problem statements: 
-1. What's the balance between agent automation and human intervention?
-2. How do we provide a non chatbox based UI?
-3. When does the agent ask vs assume?
-4. What separates this from another llm wrapper over a traditional backend?
+## Progress
 
-Deterministic:
-1. Backend wrappers over dd-cli commands
-    a. Functions for:
-        a. Search for... select restaurant 
-        b. Add to cart (req. modifiers, notes)
-        c. Checkout/payment
-        d. 
-2. Human prompting interactions for each above dd based flow step (no llm)
+| Stage | Status | Demos / wrappers |
+|-------|--------|------------------|
+| **Tier 1** — reorder path | Done | `list-addresses`, `reorder-preview` |
+| **Tier 2** — restaurant → preview | Done | `search-restaurants` … `preview-order`, `delete-cart`, `restaurant-preview` |
+| **Tier 3** — payment list | Done | `list-payment-methods` (`ListPaymentMethods`) |
+| **Tier 3** — gated submit | Next | `SubmitOrder`, `GetOrderStatus` behind explicit confirm |
+| **Later** | — | item modifiers, grocery, LLM tool routing |
 
-Agentified:
-3. Gradually introduce llm... (AI takeover)
-    a. Search flow: find me (cuisine/category) 
-        1. Agent decides where to order?
-    b. Single item flow: add item with required and optional modifiers + notes to my cart
-        1. Agent decides what to add/modify?
-    c. Ordering flow: repeat b. for given list of items, checkout 
-        1. Agent decides the whole cart state?
-
-What must/must not be automated? Full intent understanding, tool routing...Agentify process? Memory? User habits and recommendations?
-
-Human determinism reduces as we progress down this chain.
-
-Reorder flow: low intervention, stable demoable path to checkout.
-
-New restaraunt: high human in the loop intervention by design until LLM implementation
-
------
-
-Learning project: thin Go wrappers around `dd-cli`, plus small demos you can run.
+Detailed plans: `docs/plan/`.
 
 ## Layout
 
@@ -52,7 +28,7 @@ wip/
 │   ├── preview-order/
 │   ├── delete-cart/
 │   ├── restaurant-preview/   ← interactive combined flow (prompts)
-│   └── list-payment-methods/ ← tier-3 read-only checkout
+│   └── list-payment-methods/ ← tier-3: saved cards (read-only)
 ├── internal/ddcli/           ← shared CLI adapter (start with client.go)
 └── docs/
     ├── wip.md
@@ -141,6 +117,12 @@ go run ./cmd/add-cart-items \
 go run ./cmd/preview-order -cart-uuid CART_UUID
 ```
 
+**6. Abandon cart** (optional)
+
+```bash
+go run ./cmd/delete-cart -cart-uuid CART_UUID
+```
+
 ### Tier 3 checkout read-only
 
 After preview (or anytime when logged in). Cards only — no charge.
@@ -158,11 +140,13 @@ go run ./cmd/list-payment-methods
 | `list-open-carts` | — | `-store-id` |
 | `add-cart-items` | `-store-id`, `-menu-id`, `-item-id`, `-item-name` | `-quantity`, `-cart-uuid`, `-fulfillment` |
 | `preview-order` | `-cart-uuid` | — |
+| `delete-cart` | `-cart-uuid` | — |
 | `list-payment-methods` | — | — |
 
 ## Suggested reading order
 
 1. `internal/ddcli/client.go`  
 2. `internal/ddcli/address.go` + `cmd/list-addresses`  
-3. Tier-2 wrappers: `search.go` → `menu.go` → `cart.go` (`AddCartItems`) → `order.go` (`PreviewOrder`)  
-4. Tier-3 read-only: `payment.go` + `cmd/list-payment-methods`
+3. Tier 2: `search.go` → `menu.go` → `cart.go` → `order.go` (`PreviewOrder`)  
+4. Tier 3 read-only: `payment.go` + `cmd/list-payment-methods`  
+5. Next: gated submit wrappers on `feat/tier-3-gated-checkout`
