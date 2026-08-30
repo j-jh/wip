@@ -51,7 +51,8 @@ wip/
 │   ├── add-cart-items/
 │   ├── preview-order/
 │   ├── delete-cart/
-│   └── restaurant-preview/   ← interactive combined flow (prompts)
+│   ├── restaurant-preview/   ← interactive combined flow (prompts)
+│   └── list-payment-methods/ ← tier-3 read-only checkout
 ├── internal/ddcli/           ← shared CLI adapter (start with client.go)
 └── docs/
     ├── wip.md
@@ -140,6 +141,14 @@ go run ./cmd/add-cart-items \
 go run ./cmd/preview-order -cart-uuid CART_UUID
 ```
 
+### Tier 3 checkout read-only
+
+After preview (or anytime when logged in). Cards only — no charge.
+
+```bash
+go run ./cmd/list-payment-methods
+```
+
 ### Flag cheat sheet
 
 | Command | Required flags | Optional |
@@ -149,9 +158,11 @@ go run ./cmd/preview-order -cart-uuid CART_UUID
 | `list-open-carts` | — | `-store-id` |
 | `add-cart-items` | `-store-id`, `-menu-id`, `-item-id`, `-item-name` | `-quantity`, `-cart-uuid`, `-fulfillment` |
 | `preview-order` | `-cart-uuid` | — |
+| `list-payment-methods` | — | — |
 
 ## Suggested reading order
 
 1. `internal/ddcli/client.go`  
 2. `internal/ddcli/address.go` + `cmd/list-addresses`  
 3. Tier-2 wrappers: `search.go` → `menu.go` → `cart.go` (`AddCartItems`) → `order.go` (`PreviewOrder`)  
+4. Tier-3 read-only: `payment.go` + `cmd/list-payment-methods`
