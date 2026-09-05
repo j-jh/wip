@@ -45,7 +45,7 @@ Learning project: thin Go wrappers around `dd-cli`, plus small demos you can run
 | **Tier 1** — reorder path | Done | `list-addresses`, `reorder-preview` |
 | **Tier 2** — restaurant → preview | Done | `search-restaurants` … `preview-order`, `delete-cart`, `restaurant-preview` |
 | **Tier 3** — payment list | Done | `list-payment-methods` (`ListPaymentMethods`) |
-| **Tier 3** — gated submit | Next | `SubmitOrder`, `GetOrderStatus` behind explicit confirm |
+| **Tier 3** — gated submit | Done | `submit-order` (`-confirm-submit`), `order-status` |
 | **Later** | — | item modifiers, grocery, LLM tool routing |
 
 Detailed plans: `docs/plan/`.
@@ -64,7 +64,9 @@ wip/
 │   ├── preview-order/
 │   ├── delete-cart/
 │   ├── restaurant-preview/   ← interactive combined flow (prompts)
-│   └── list-payment-methods/ ← tier-3: saved cards (read-only)
+│   ├── list-payment-methods/ ← tier-3: saved cards (read-only)
+│   ├── submit-order/         ← tier-3: gated charge (needs -confirm-submit)
+│   └── order-status/         ← tier-3: poll after submit
 ├── internal/ddcli/           ← shared CLI adapter (start with client.go)
 └── docs/
     ├── wip.md
@@ -167,6 +169,23 @@ After preview (or anytime when logged in). Cards only — no charge.
 go run ./cmd/list-payment-methods
 ```
 
+### Tier 3 gated submit (charges money)
+
+Shows preview + payment summary first. Without `-confirm-submit`, exits with **no charge**.
+With `-confirm-submit`, type `yes` (or pass `-yes` to skip typing). Tip is in **cents**.
+
+```bash
+# dry run — prints quote, does not charge
+go run ./cmd/submit-order -cart-uuid CART_UUID -tip-cents 0
+
+# place order (destructive)
+go run ./cmd/submit-order -cart-uuid CART_UUID -tip-cents 0 -confirm-submit
+
+# after submit
+go run ./cmd/order-status -order-uuid ORDER_UUID
+go run ./cmd/order-status -order-uuid ORDER_UUID -poll
+```
+
 ### Flag cheat sheet
 
 | Command | Required flags | Optional |
@@ -178,6 +197,8 @@ go run ./cmd/list-payment-methods
 | `preview-order` | `-cart-uuid` | — |
 | `delete-cart` | `-cart-uuid` | — |
 | `list-payment-methods` | — | — |
+| `submit-order` | `-cart-uuid`, `-tip-cents` | `-confirm-submit`, `-yes`, `-fulfillment` |
+| `order-status` | `-order-uuid` | `-poll` |
 
 ## Suggested reading order
 
@@ -185,4 +206,4 @@ go run ./cmd/list-payment-methods
 2. `internal/ddcli/address.go` + `cmd/list-addresses`  
 3. Tier 2: `search.go` → `menu.go` → `cart.go` → `order.go` (`PreviewOrder`)  
 4. Tier 3 read-only: `payment.go` + `cmd/list-payment-methods`  
-5. Next: gated submit wrappers on `feat/tier-3-gated-checkout`
+5. Tier 3 gated: `order.go` (`SubmitOrder`, `GetOrderStatus`) + `cmd/submit-order`

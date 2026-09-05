@@ -378,3 +378,166 @@ func simplifyPreviewQuote(rawQuote *previewQuoteJSON) PreviewOrderQuote {
 	}
 	return quote
 }
+
+// SubmitOrderOptions holds inputs for placing an order (charges default payment).
+//
+// Fields:
+//   - CartUUID (string) — required; cart from add-items / reorder
+//   - TipCents (int) — Dasher tip in CENTS (not dollars). 0 = no tip (required for pickup)
+//   - Fulfillment (string) — optional "delivery" or "pickup"; empty keeps cart mode
+//   - ScheduledTime (string) — optional ISO-8601 UTC; empty = ASAP
+//   - Priority (bool) — express delivery upgrade; delivery only
+//   - NoApplyCredits (bool) — opt out of DoorDash credits (must match preview)
+type SubmitOrderOptions struct {
+	CartUUID       string
+	TipCents       int
+	Fulfillment    string
+	ScheduledTime  string
+	Priority       bool
+	NoApplyCredits bool
+}
+
+// SubmitOrderResult is the structuredContent payload for order submit.
+//
+// Fields:
+//   - Success (bool) — CLI reported success (accepted into processing)
+//   - Message (string) — optional status / error text
+//   - OrderUUID (string) — id for order status / history
+//   - CartUUID (string) — cart that was submitted (may be empty)
+type SubmitOrderResult struct {
+	Success   bool   `json:"success"`
+	Message   string `json:"message,omitempty"`
+	OrderUUID string `json:"order_uuid"`
+	CartUUID  string `json:"cart_uuid,omitempty"`
+}
+
+// SubmitOrder places an order and charges the consumer's default payment method.
+//
+// Params:
+//   - ctx (context.Context) — cancel / timeout for the CLI call
+//   - intentText (string) — required DoorDash intent blob; use BuildIntent() to build it
+//   - options (SubmitOrderOptions) — cart, tip, optional fulfillment / schedule flags
+//
+// Returns:
+//   - *SubmitOrderResult — order_uuid plus success flag
+//   - error — missing args, CLI failure, bad JSON, or success:false from CLI
+//
+// Notes: runs `dd-cli --json-output order submit … --yes`. Always passes --yes because
+// this Go process is non-interactive to the CLI — callers must gate confirmation themselves
+// before calling this method. DESTRUCTIVE: charges money. Treat the cart as spent after success;
+// re-submitting the same cart_uuid can duplicate the order. Poll GetOrderStatus until not pending.
+func (client *CLIClient) SubmitOrder(ctx context.Context, intentText string, options SubmitOrderOptions) (*SubmitOrderResult, error) {
+	if intentText == "" {
+		return nil, fmt.Errorf("ddcli: intent is required")
+	}
+	if options.CartUUID == "" {
+		return nil, fmt.Errorf("ddcli: cartUUID is required")
+	}
+	if options.TipCents < 0 {
+		return nil, fmt.Errorf("ddcli: tipCents must be >= 0 (cents, not dollars)")
+	}
+
+	cliArgs := []string{
+		"order", "submit",
+		"--cart-uuid", options.CartUUID,
+		"--tip-cents", strconv.Itoa(options.TipCents),
+		"--yes",
+		"--intent", intentText,
+	}
+	if options.Fulfillment != "" {
+		cliArgs = append(cliArgs, "--fulfillment", options.Fulfillment)
+	}
+	if options.ScheduledTime != "" {
+		cliArgs = append(cliArgs, "--scheduled-time", options.ScheduledTime)
+	}
+	if options.Priority {
+		cliArgs = append(cliArgs, "--priority")
+	}
+	if options.NoApplyCredits {
+		cliArgs = append(cliArgs, "--no-apply-credits")
+	}
+
+	cliStdout, err := client.RunCLICommand(ctx, cliArgs...)
+	if err != nil {
+		return nil, err
+	}
+
+	var submitResult SubmitOrderResult
+	if err := decodeStructuredContent(cliStdout, &submitResult); err != nil {
+		return nil, err
+	}
+
+	if !submitResult.Success {
+		failureMessage := submitResult.Message
+		if failureMessage == "" {
+			failureMessage = "order submit failed"
+		}
+		return &submitResult, fmt.Errorf("ddcli: %s", failureMessage)
+	}
+
+	return &submitResult, nil
+}
+
+// GetOrderStatusResult is the structuredContent payload for order status.
+//
+// Fields:
+//   - Success (bool) — CLI reported success
+//   - Message (string) — optional status / error text
+//   - OrderUUID (string) — order being checked
+//   - Status (string) — successful | pending | action_required | failed | not_found
+//   - ErrorMessage (string) — present on failed / some degraded outcomes
+type GetOrderStatusResult struct {
+	Success      bool   `json:"success"`
+	Message      string `json:"message,omitempty"`
+	OrderUUID    string `json:"order_uuid,omitempty"`
+	Status       string `json:"status"`
+	ErrorMessage string `json:"error_message,omitempty"`
+}
+
+// GetOrderStatus checks whether a submitted order cleared processing.
+//
+// Params:
+//   - ctx (context.Context) — cancel / timeout for the CLI call
+//   - intentText (string) — required DoorDash intent blob; use BuildIntent() to build it
+//   - orderUUID (string) — from SubmitOrder (or order history)
+//
+// Returns:
+//   - *GetOrderStatusResult — status string plus success flag
+//   - error — missing args, CLI failure, bad JSON, or success:false from CLI
+//
+// Notes: runs `dd-cli --json-output order status --order-uuid …`. Read-only.
+// One call is one check — callers own any retry loop while status is pending.
+// Report "order placed" only when Status == "successful".
+func (client *CLIClient) GetOrderStatus(ctx context.Context, intentText string, orderUUID string) (*GetOrderStatusResult, error) {
+	if intentText == "" {
+		return nil, fmt.Errorf("ddcli: intent is required")
+	}
+	if orderUUID == "" {
+		return nil, fmt.Errorf("ddcli: orderUUID is required")
+	}
+
+	cliStdout, err := client.RunCLICommand(
+		ctx,
+		"order", "status",
+		"--order-uuid", orderUUID,
+		"--intent", intentText,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var statusResult GetOrderStatusResult
+	if err := decodeStructuredContent(cliStdout, &statusResult); err != nil {
+		return nil, err
+	}
+
+	if !statusResult.Success {
+		failureMessage := statusResult.Message
+		if failureMessage == "" {
+			failureMessage = "order status failed"
+		}
+		return &statusResult, fmt.Errorf("ddcli: %s", failureMessage)
+	}
+
+	return &statusResult, nil
+}

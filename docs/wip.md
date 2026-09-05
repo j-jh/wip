@@ -3,7 +3,8 @@
 Plans:
 - [plan/tier-1-reads.md](plan/tier-1-reads.md) — early read-only wrappers
 - [plan/phase-1.md](plan/phase-1.md) — reorder → preview vertical slice
-- [plan/tier-3-checkout-readonly.md](plan/tier-3-checkout-readonly.md) — payment-method list (in progress)
+- [plan/tier-3-checkout-readonly.md](plan/tier-3-checkout-readonly.md) — payment-method list
+- [plan/tier-3-gated-checkout.md](plan/tier-3-gated-checkout.md) — gated submit + status
 
 Function comment style: [function-docs.md](function-docs.md).
 
@@ -15,8 +16,8 @@ Function comment style: [function-docs.md](function-docs.md).
   - `cmd/search-restaurants`, `cmd/get-menu`, `cmd/list-open-carts`
   - `cmd/add-cart-items`, `cmd/preview-order`, `cmd/delete-cart`
   - `cmd/restaurant-preview` — interactive login → search → menu → add → preview
-- Tier 3 (starting): `cmd/list-payment-methods`
+- Tier 3: `cmd/list-payment-methods`, `cmd/submit-order`, `cmd/order-status`
 
 ## Implemented wrappers
 
-`ListDeliveryAddresses`, `ListOrderHistory`, `FindNearbyStores`, `ListOpenCarts`, `ReorderPastOrder`, `PreviewOrder`, `SearchRestaurants`, `GetMenu`, `AddCartItems`, `DeleteCart`, `ListPaymentMethods`
+`ListDeliveryAddresses`, `ListOrderHistory`, `FindNearbyStores`, `ListOpenCarts`, `ReorderPastOrder`, `PreviewOrder`, `SearchRestaurants`, `GetMenu`, `AddCartItems`, `DeleteCart`, `ListPaymentMethods`, `SubmitOrder`, `GetOrderStatus`
