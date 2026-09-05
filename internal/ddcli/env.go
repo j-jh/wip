@@ -7,9 +7,9 @@ import (
 	"strings"
 )
 
-// EnvAllowSubmit is the env var that unlocks SubmitOrder (charges money).
-// Set WIP_ALLOW_SUBMIT=true in .env (gitignored) or the process environment.
-const EnvAllowSubmit = "WIP_ALLOW_SUBMIT"
+// EnvAllowSubmitOrder is the env var that unlocks SubmitOrder (charges money).
+// Set ALLOW_SUBMIT_ORDER=true in .env (gitignored) or the process environment.
+const EnvAllowSubmitOrder = "ALLOW_SUBMIT_ORDER"
 
 // LoadDotEnv reads KEY=VALUE lines from path into the process environment.
 // Does not overwrite keys that are already set. Missing file is a no-op.
@@ -54,9 +54,9 @@ func LoadDotEnv(path string) error {
 	return scanner.Err()
 }
 
-// AllowSubmit reports whether WIP_ALLOW_SUBMIT is enabled (true/1/yes).
+// AllowSubmit reports whether ALLOW_SUBMIT_ORDER is enabled (true/1/yes).
 // Call LoadDotEnv(".env") first from demos so a local file is picked up.
 func AllowSubmit() bool {
-	rawValue := strings.TrimSpace(strings.ToLower(os.Getenv(EnvAllowSubmit)))
+	rawValue := strings.TrimSpace(strings.ToLower(os.Getenv(EnvAllowSubmitOrder)))
 	return rawValue == "true" || rawValue == "1" || rawValue == "yes"
 }

@@ -80,7 +80,7 @@ Copy env template once:
 
 ```bash
 cp .env.example .env
-# leave WIP_ALLOW_SUBMIT=false until you intentionally want to charge
+# leave ALLOW_SUBMIT_ORDER=false until you intentionally want to charge
 ```
 
 ## Prerequisites
@@ -180,7 +180,7 @@ go run ./cmd/list-payment-methods
 
 Shows preview + payment summary first. **Three gates** — all required to charge:
 
-1. `WIP_ALLOW_SUBMIT=true` in `.env` (see `.env.example`; default `false`)
+1. `ALLOW_SUBMIT_ORDER=true` in `.env` (see `.env.example`; default `false`)
 2. `-confirm-submit` flag
 3. Type `yes` (or pass `-yes` to skip typing)
 
@@ -190,7 +190,7 @@ Without the env flag or `-confirm-submit`, exits with **no charge**. Tip is in *
 # dry run — prints quote, does not charge (env can stay false)
 go run ./cmd/submit-order -cart-uuid CART_UUID -tip-cents 0
 
-# place order (destructive) — set WIP_ALLOW_SUBMIT=true in .env first
+# place order (destructive) — set ALLOW_SUBMIT_ORDER=true in .env first
 go run ./cmd/submit-order -cart-uuid CART_UUID -tip-cents 0 -confirm-submit
 
 # after submit

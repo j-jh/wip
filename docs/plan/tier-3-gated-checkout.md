@@ -22,7 +22,7 @@ Branch: `feat/tier-3-gated-checkout`.
 
 ## Gate rules
 
-1. `WIP_ALLOW_SUBMIT=true` in `.env` (or process env). Default / example is `false`.
+1. `ALLOW_SUBMIT_ORDER=true` in `.env` (or process env). Default / example is `false`.
 2. Demo always prints preview + payment label first.
 3. Without `-confirm-submit`, exit with no charge.
 4. With `-confirm-submit`, require typing `yes` unless `-yes` (scripted).

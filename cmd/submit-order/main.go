@@ -12,7 +12,7 @@
 // Without -confirm-submit the command prints a quote + card summary and exits.
 // Tip is in CENTS (500 = $5.00). Use 0 for pickup / explicit no tip.
 //
-// Also requires WIP_ALLOW_SUBMIT=true in .env (see .env.example). Default is false.
+// Also requires ALLOW_SUBMIT_ORDER=true in .env (see .env.example). Default is false.
 //
 // Needs dd-cli login. After success, poll with cmd/order-status.
 package main
@@ -72,7 +72,7 @@ func main() {
 	if !ddcli.AllowSubmit() {
 		fmt.Println()
 		fmt.Printf("Stopped — no charge. Set %s=true in .env (see .env.example), then re-run.\n",
-			ddcli.EnvAllowSubmit)
+			ddcli.EnvAllowSubmitOrder)
 		return
 	}
 
