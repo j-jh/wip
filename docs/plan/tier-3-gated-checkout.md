@@ -22,10 +22,13 @@ Branch: `feat/tier-3-gated-checkout`.
 
 ## Gate rules
 
-1. Demo always prints preview + payment label first.
-2. Without `-confirm-submit`, exit with no charge.
-3. With `-confirm-submit`, require typing `yes` unless `-yes` (scripted).
-4. `-tip-cents` is required (cents, not dollars). Use `0` for pickup / no tip.
+1. `WIP_ALLOW_SUBMIT=true` in `.env` (or process env). Default / example is `false`.
+2. Demo always prints preview + payment label first.
+3. Without `-confirm-submit`, exit with no charge.
+4. With `-confirm-submit`, require typing `yes` unless `-yes` (scripted).
+5. `-tip-cents` is required (cents, not dollars). Use `0` for pickup / no tip.
+
+`SubmitOrder` itself refuses when the env flag is off — flags alone cannot charge.
 
 ---
 

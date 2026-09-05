@@ -424,9 +424,13 @@ type SubmitOrderResult struct {
 //
 // Notes: runs `dd-cli --json-output order submit … --yes`. Always passes --yes because
 // this Go process is non-interactive to the CLI — callers must gate confirmation themselves
-// before calling this method. DESTRUCTIVE: charges money. Treat the cart as spent after success;
-// re-submitting the same cart_uuid can duplicate the order. Poll GetOrderStatus until not pending.
+// before calling this method. Also requires WIP_ALLOW_SUBMIT=true (see .env.example).
+// DESTRUCTIVE: charges money. Treat the cart as spent after success; re-submitting the same
+// cart_uuid can duplicate the order. Poll GetOrderStatus until not pending.
 func (client *CLIClient) SubmitOrder(ctx context.Context, intentText string, options SubmitOrderOptions) (*SubmitOrderResult, error) {
+	if !AllowSubmit() {
+		return nil, fmt.Errorf("ddcli: submit blocked — set %s=true in .env (see .env.example)", EnvAllowSubmit)
+	}
 	if intentText == "" {
 		return nil, fmt.Errorf("ddcli: intent is required")
 	}

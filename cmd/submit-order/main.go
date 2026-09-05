@@ -12,6 +12,8 @@
 // Without -confirm-submit the command prints a quote + card summary and exits.
 // Tip is in CENTS (500 = $5.00). Use 0 for pickup / explicit no tip.
 //
+// Also requires WIP_ALLOW_SUBMIT=true in .env (see .env.example). Default is false.
+//
 // Needs dd-cli login. After success, poll with cmd/order-status.
 package main
 
@@ -34,6 +36,10 @@ func main() {
 	confirmSubmit := flag.Bool("confirm-submit", false, "required: acknowledge this will charge money")
 	skipTypedYes := flag.Bool("yes", false, "skip typing yes after the summary (still needs -confirm-submit)")
 	flag.Parse()
+
+	if err := ddcli.LoadDotEnv(".env"); err != nil {
+		log.Fatal(err)
+	}
 
 	if *cartUUID == "" {
 		log.Fatal("missing -cart-uuid")
@@ -62,6 +68,13 @@ func main() {
 	fmt.Println("=== payment ===")
 	fmt.Println(paymentLabel)
 	fmt.Printf("tip_cents %d ($%.2f)\n", *tipCents, float64(*tipCents)/100)
+
+	if !ddcli.AllowSubmit() {
+		fmt.Println()
+		fmt.Printf("Stopped — no charge. Set %s=true in .env (see .env.example), then re-run.\n",
+			ddcli.EnvAllowSubmit)
+		return
+	}
 
 	if !*confirmSubmit {
 		fmt.Println()

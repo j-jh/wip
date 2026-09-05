@@ -76,6 +76,13 @@ wip/
 
 Local-only (gitignored): `self-docs/`, `agent-ref/`, `.env`.
 
+Copy env template once:
+
+```bash
+cp .env.example .env
+# leave WIP_ALLOW_SUBMIT=false until you intentionally want to charge
+```
+
 ## Prerequisites
 
 ```bash
@@ -171,14 +178,19 @@ go run ./cmd/list-payment-methods
 
 ### Tier 3 gated submit (charges money)
 
-Shows preview + payment summary first. Without `-confirm-submit`, exits with **no charge**.
-With `-confirm-submit`, type `yes` (or pass `-yes` to skip typing). Tip is in **cents**.
+Shows preview + payment summary first. **Three gates** — all required to charge:
+
+1. `WIP_ALLOW_SUBMIT=true` in `.env` (see `.env.example`; default `false`)
+2. `-confirm-submit` flag
+3. Type `yes` (or pass `-yes` to skip typing)
+
+Without the env flag or `-confirm-submit`, exits with **no charge**. Tip is in **cents**.
 
 ```bash
-# dry run — prints quote, does not charge
+# dry run — prints quote, does not charge (env can stay false)
 go run ./cmd/submit-order -cart-uuid CART_UUID -tip-cents 0
 
-# place order (destructive)
+# place order (destructive) — set WIP_ALLOW_SUBMIT=true in .env first
 go run ./cmd/submit-order -cart-uuid CART_UUID -tip-cents 0 -confirm-submit
 
 # after submit
