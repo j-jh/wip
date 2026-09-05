@@ -38,6 +38,18 @@ New restaraunt: high human in the loop intervention by design until LLM implemen
 
 Learning project: thin Go wrappers around `dd-cli`, plus small demos you can run.
 
+## Progress
+
+| Stage | Status | Demos / wrappers |
+|-------|--------|------------------|
+| **Tier 1** — reorder path | Done | `list-addresses`, `reorder-preview` |
+| **Tier 2** — restaurant → preview | Done | `search-restaurants` … `preview-order`, `delete-cart`, `restaurant-preview` |
+| **Tier 3** — payment list | Done | `list-payment-methods` (`ListPaymentMethods`) |
+| **Tier 3** — gated submit | Done | `submit-order` (`-confirm-submit`), `order-status` |
+| **Later** | — | item modifiers, grocery, LLM tool routing |
+
+Detailed plans: `docs/plan/`.
+
 ## Layout
 
 ```text
@@ -52,7 +64,9 @@ wip/
 │   ├── preview-order/
 │   ├── delete-cart/
 │   ├── restaurant-preview/   ← interactive combined flow (prompts)
-│   └── list-payment-methods/ ← tier-3 read-only checkout
+│   ├── list-payment-methods/ ← tier-3: saved cards (read-only)
+│   ├── submit-order/         ← tier-3: gated charge (needs -confirm-submit)
+│   └── order-status/         ← tier-3: poll after submit
 ├── internal/ddcli/           ← shared CLI adapter (start with client.go)
 └── docs/
     ├── wip.md
@@ -61,6 +75,13 @@ wip/
 ```
 
 Local-only (gitignored): `self-docs/`, `agent-ref/`, `.env`.
+
+Copy env template once:
+
+```bash
+cp .env.example .env
+# leave ALLOW_SUBMIT_ORDER=false until you intentionally want to charge
+```
 
 ## Prerequisites
 
@@ -141,12 +162,40 @@ go run ./cmd/add-cart-items \
 go run ./cmd/preview-order -cart-uuid CART_UUID
 ```
 
+**6. Abandon cart** (optional)
+
+```bash
+go run ./cmd/delete-cart -cart-uuid CART_UUID
+```
+
 ### Tier 3 checkout read-only
 
 After preview (or anytime when logged in). Cards only — no charge.
 
 ```bash
 go run ./cmd/list-payment-methods
+```
+
+### Tier 3 gated submit (charges money)
+
+Shows preview + payment summary first. **Three gates** — all required to charge:
+
+1. `ALLOW_SUBMIT_ORDER=true` in `.env` (see `.env.example`; default `false`)
+2. `-confirm-submit` flag
+3. Type `yes` (or pass `-yes` to skip typing)
+
+Without the env flag or `-confirm-submit`, exits with **no charge**. Tip is in **cents**.
+
+```bash
+# dry run — prints quote, does not charge (env can stay false)
+go run ./cmd/submit-order -cart-uuid CART_UUID -tip-cents 0
+
+# place order (destructive) — set ALLOW_SUBMIT_ORDER=true in .env first
+go run ./cmd/submit-order -cart-uuid CART_UUID -tip-cents 0 -confirm-submit
+
+# after submit
+go run ./cmd/order-status -order-uuid ORDER_UUID
+go run ./cmd/order-status -order-uuid ORDER_UUID -poll
 ```
 
 ### Flag cheat sheet
@@ -158,11 +207,15 @@ go run ./cmd/list-payment-methods
 | `list-open-carts` | — | `-store-id` |
 | `add-cart-items` | `-store-id`, `-menu-id`, `-item-id`, `-item-name` | `-quantity`, `-cart-uuid`, `-fulfillment` |
 | `preview-order` | `-cart-uuid` | — |
+| `delete-cart` | `-cart-uuid` | — |
 | `list-payment-methods` | — | — |
+| `submit-order` | `-cart-uuid`, `-tip-cents` | `-confirm-submit`, `-yes`, `-fulfillment` |
+| `order-status` | `-order-uuid` | `-poll` |
 
 ## Suggested reading order
 
 1. `internal/ddcli/client.go`  
 2. `internal/ddcli/address.go` + `cmd/list-addresses`  
-3. Tier-2 wrappers: `search.go` → `menu.go` → `cart.go` (`AddCartItems`) → `order.go` (`PreviewOrder`)  
-4. Tier-3 read-only: `payment.go` + `cmd/list-payment-methods`
+3. Tier 2: `search.go` → `menu.go` → `cart.go` → `order.go` (`PreviewOrder`)  
+4. Tier 3 read-only: `payment.go` + `cmd/list-payment-methods`  
+5. Tier 3 gated: `order.go` (`SubmitOrder`, `GetOrderStatus`) + `cmd/submit-order`
